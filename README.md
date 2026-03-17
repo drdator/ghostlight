@@ -11,6 +11,7 @@ Press **Option+Space** to summon a terminal by default. Press it again to dismis
 - Configurable fresh or persistent sessions (`fresh` pre-spawns the next shell for instant launch)
 - Runs as a menu bar app (no dock icon)
 - Configurable window size, padding, corner radius, colors, font size, and working directory
+- `Cmd+Enter` copies the last command output and closes, `Cmd+Shift+Enter` copies the full buffer and closes
 - Cmd+C / Cmd+V clipboard support
 
 ## Requirements

@@ -1,10 +1,12 @@
 import AppKit
+import Carbon
 import CLibGhostty
 import QuartzCore
 
 class TerminalView: NSView {
     var surface: ghostty_surface_t?
     weak var ghosttyApp: GhosttyApp?
+    var onCopyVisibleContentAndClose: (() -> Void)?
     private var trackingArea: NSTrackingArea?
 
     // MARK: - Init
@@ -183,6 +185,27 @@ class TerminalView: NSView {
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard let surface else { return false }
+        let modifiers = normalizedModifierFlags(event)
+
+        if isEnterKey(event) {
+            if modifiers == [.command] {
+                guard copyLastCommandOutputToClipboard() else {
+                    NSSound.beep()
+                    return true
+                }
+                onCopyVisibleContentAndClose?()
+                return true
+            }
+
+            if modifiers == [.command, .shift] {
+                guard copyScreenContentsToClipboard() else {
+                    NSSound.beep()
+                    return true
+                }
+                onCopyVisibleContentAndClose?()
+                return true
+            }
+        }
 
         // Handle Cmd+V paste directly — avoids ghostty clipboard callback issues
         if event.modifierFlags.contains(.command),
@@ -301,6 +324,59 @@ class TerminalView: NSView {
         if flags.contains(.command) { raw |= GHOSTTY_MODS_SUPER.rawValue }
         if flags.contains(.capsLock) { raw |= GHOSTTY_MODS_CAPS.rawValue }
         return ghostty_input_mods_e(rawValue: raw)
+    }
+
+    private func copyLastCommandOutputToClipboard() -> Bool {
+        guard let surface else { return false }
+
+        var text = ghostty_text_s()
+        guard ghostty_surface_read_last_output(surface, &text), let ptr = text.text else { return false }
+        defer { ghostty_surface_free_text(surface, &text) }
+
+        let data = Data(bytes: ptr, count: Int(text.text_len))
+        let string = String(data: data, encoding: .utf8) ?? ""
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(string, forType: .string)
+        return true
+    }
+
+    private func copyScreenContentsToClipboard() -> Bool {
+        guard let surface else { return false }
+
+        let selection = ghostty_selection_s(
+            top_left: ghostty_point_s(
+                tag: GHOSTTY_POINT_SCREEN,
+                coord: GHOSTTY_POINT_COORD_TOP_LEFT,
+                x: 0,
+                y: 0
+            ),
+            bottom_right: ghostty_point_s(
+                tag: GHOSTTY_POINT_SCREEN,
+                coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT,
+                x: 0,
+                y: 0
+            ),
+            rectangle: false
+        )
+        var text = ghostty_text_s()
+        guard ghostty_surface_read_text(surface, selection, &text), let ptr = text.text else { return false }
+        defer { ghostty_surface_free_text(surface, &text) }
+
+        let data = Data(bytes: ptr, count: Int(text.text_len))
+        let string = String(data: data, encoding: .utf8) ?? ""
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(string, forType: .string)
+        return true
+    }
+
+    private func isEnterKey(_ event: NSEvent) -> Bool {
+        event.keyCode == UInt16(kVK_Return) || event.keyCode == UInt16(kVK_ANSI_KeypadEnter)
+    }
+
+    private func normalizedModifierFlags(_ event: NSEvent) -> NSEvent.ModifierFlags {
+        event.modifierFlags
+            .intersection(.deviceIndependentFlagsMask)
+            .subtracting(.numericPad)
     }
 
     deinit {

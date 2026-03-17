@@ -54,6 +54,9 @@ class GhostlightPanel {
         terminalView.layer?.cornerRadius = cfg.innerCornerRadius
         terminalView.layer?.masksToBounds = true
         terminalView.ghosttyApp = ghosttyApp
+        terminalView.onCopyVisibleContentAndClose = { [weak self] in
+            self?.hide()
+        }
         ghosttyApp.activeTerminalView = terminalView
         containerView.addSubview(terminalView)
 

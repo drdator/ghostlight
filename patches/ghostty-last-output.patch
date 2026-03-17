@@ -1,0 +1,80 @@
+diff --git a/include/ghostty.h b/include/ghostty.h
+index 40ff55c9b..ac4a31c87 100644
+--- a/include/ghostty.h
++++ b/include/ghostty.h
+@@ -1127,6 +1127,7 @@ void ghostty_surface_complete_clipboard_request(ghostty_surface_t,
+                                                 bool);
+ bool ghostty_surface_has_selection(ghostty_surface_t);
+ bool ghostty_surface_read_selection(ghostty_surface_t, ghostty_text_s*);
++bool ghostty_surface_read_last_output(ghostty_surface_t, ghostty_text_s*);
+ bool ghostty_surface_read_text(ghostty_surface_t,
+                                ghostty_selection_s,
+                                ghostty_text_s*);
+diff --git a/src/apprt/embedded.zig b/src/apprt/embedded.zig
+index 0d5a4f8da..a4d785f1a 100644
+--- a/src/apprt/embedded.zig
++++ b/src/apprt/embedded.zig
+@@ -1620,6 +1620,24 @@ pub const CAPI = struct {
+         return readTextLocked(surface, core_sel, result);
+     }
+ 
++    /// Read the most recent command output using semantic prompt metadata.
++    ///
++    /// This requires shell integration prompt markers to be active.
++    export fn ghostty_surface_read_last_output(
++        surface: *Surface,
++        result: *Text,
++    ) bool {
++        const core_surface = &surface.core_surface;
++        core_surface.renderer_state.mutex.lock();
++        defer core_surface.renderer_state.mutex.unlock();
++
++        const core_sel = lastOutputSelectionLocked(
++            core_surface.renderer_state.terminal.screens.active,
++        ) orelse return false;
++
++        return readTextLocked(surface, core_sel, result);
++    }
++
+     /// Read some arbitrary text from the surface.
+     ///
+     /// This is an expensive operation so it shouldn't be called too
+@@ -1640,6 +1658,38 @@ pub const CAPI = struct {
+         return readTextLocked(surface, core_sel, result);
+     }
+ 
++    fn lastOutputSelectionLocked(
++        screen: *terminal.Screen,
++    ) ?terminal.Selection {
++        if (!screen.semantic_prompt.seen) return null;
++
++        if (screen.cursor.semantic_content == .output) {
++            return screen.selectOutput(screen.cursor.page_pin.*);
++        }
++
++        const prompt_pin: terminal.Pin = prompt: {
++            var it = screen.cursor.page_pin.promptIterator(.left_up, null);
++
++            // Skip the current prompt so we capture the previous command output.
++            _ = it.next() orelse return null;
++            break :prompt it.next() orelse return null;
++        };
++
++        var hl = screen.pages.highlightSemanticContent(
++            prompt_pin,
++            .output,
++        ) orelse return null;
++
++        var cell_it = hl.end.cellIterator(.left_up, hl.start);
++        while (cell_it.next()) |p| {
++            const cell = p.rowAndCell().cell;
++            hl.end = p;
++            if (cell.hasText()) break;
++        }
++
++        return .init(hl.start, hl.end, false);
++    }
++
+     fn readTextLocked(
+         surface: *Surface,
+         core_sel: terminal.Selection,

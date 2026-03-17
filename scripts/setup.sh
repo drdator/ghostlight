@@ -54,6 +54,22 @@ else
     git clone https://github.com/ghostty-org/ghostty.git "$GHOSTTY_DIR"
 fi
 
+# --- Apply Ghostty patches required by Ghostlight ---
+
+PATCH_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/patches/ghostty-last-output.patch"
+if [ -f "$PATCH_FILE" ]; then
+    info "Applying Ghostty patches..."
+    if git -C "$GHOSTTY_DIR" apply --check "$PATCH_FILE" >/dev/null 2>&1; then
+        git -C "$GHOSTTY_DIR" apply "$PATCH_FILE"
+        dim  "Applied ghostty-last-output.patch"
+    elif git -C "$GHOSTTY_DIR" apply --reverse --check "$PATCH_FILE" >/dev/null 2>&1; then
+        dim  "ghostty-last-output.patch already applied."
+    else
+        warn "ghostty-last-output.patch could not be applied cleanly."
+        exit 1
+    fi
+fi
+
 # --- Patch build.zig to skip XCFramework (requires iOS SDK / full Xcode) ---
 
 BUILDZIG="$GHOSTTY_DIR/build.zig"
