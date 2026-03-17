@@ -52,7 +52,18 @@ class TerminalView: NSView {
         config.font_size = ghosttyApp?.config_.fontSize ?? 0
         config.context = GHOSTTY_SURFACE_CONTEXT_WINDOW
 
-        surface = ghostty_surface_new(appHandle, &config)
+        var dir = ghosttyApp?.config_.workingDirectory ?? ""
+        if dir.hasPrefix("~") {
+            dir = NSString(string: dir).expandingTildeInPath
+        }
+        if dir.isEmpty {
+            surface = ghostty_surface_new(appHandle, &config)
+        } else {
+            dir.withCString { cStr in
+                config.working_directory = cStr
+                surface = ghostty_surface_new(appHandle, &config)
+            }
+        }
         guard let surface else { return }
 
         let scale = Double(window?.backingScaleFactor ?? 2.0)
@@ -171,8 +182,39 @@ class TerminalView: NSView {
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        // Let Cmd+key combinations be handled by ghostty for copy/paste etc.
         guard let surface else { return false }
+
+        // Handle Cmd+V paste directly — avoids ghostty clipboard callback issues
+        if event.modifierFlags.contains(.command),
+           event.charactersIgnoringModifiers == "v" {
+            let str = NSPasteboard.general.string(forType: .string) ?? ""
+            if !str.isEmpty {
+                let utf8 = Array(str.utf8)
+                utf8.withUnsafeBufferPointer { buf in
+                    guard let base = buf.baseAddress else { return }
+                    base.withMemoryRebound(to: CChar.self, capacity: buf.count) { ptr in
+                        ghostty_surface_text(surface, ptr, UInt(buf.count))
+                    }
+                }
+            }
+            return true
+        }
+
+        // Handle Cmd+C copy
+        if event.modifierFlags.contains(.command),
+           event.charactersIgnoringModifiers == "c" {
+            if ghostty_surface_has_selection(surface) {
+                var text = ghostty_text_s()
+                if ghostty_surface_read_selection(surface, &text), let ptr = text.text {
+                    let data = Data(bytes: ptr, count: Int(text.text_len))
+                    let str = String(data: data, encoding: .utf8) ?? ""
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(str, forType: .string)
+                    ghostty_surface_free_text(surface, &text)
+                }
+                return true
+            }
+        }
 
         let chars = event.characters ?? ""
         let handled: Bool = chars.withCString { cStr in

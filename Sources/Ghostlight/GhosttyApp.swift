@@ -199,9 +199,12 @@ private func ghostlightReadClipboard(
     let app = Unmanaged<GhosttyApp>.fromOpaque(userdata).takeUnretainedValue()
     guard let surface = app.activeTerminalView?.surface else { return false }
 
+    // Read clipboard and complete on next run loop to avoid re-entrancy
     let str = NSPasteboard.general.string(forType: .string) ?? ""
-    str.withCString { cStr in
-        ghostty_surface_complete_clipboard_request(surface, cStr, state, true)
+    let strCopy = strdup(str)
+    DispatchQueue.main.async {
+        ghostty_surface_complete_clipboard_request(surface, strCopy, state, true)
+        free(strCopy)
     }
     return true
 }
@@ -212,11 +215,15 @@ private func ghostlightConfirmReadClipboard(
     _ state: UnsafeMutableRawPointer?,
     _ request: ghostty_clipboard_request_e
 ) {
-    // Auto-confirm clipboard reads
     guard let userdata else { return }
     let app = Unmanaged<GhosttyApp>.fromOpaque(userdata).takeUnretainedValue()
     guard let surface = app.activeTerminalView?.surface else { return }
-    ghostty_surface_complete_clipboard_request(surface, contents, state, true)
+    // Auto-confirm, defer to avoid re-entrancy
+    let contentsCopy = contents != nil ? strdup(contents!) : nil
+    DispatchQueue.main.async {
+        ghostty_surface_complete_clipboard_request(surface, contentsCopy, state, true)
+        free(contentsCopy)
+    }
 }
 
 private func ghostlightWriteClipboard(
