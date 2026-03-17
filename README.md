@@ -2,11 +2,11 @@
 
 A Spotlight-like floating terminal for macOS, powered by [libghostty](https://github.com/ghostty-org/ghostty).
 
-Press **Option+Space** to summon a terminal. Press it again to dismiss. Each invocation starts a fresh shell.
+Press **Option+Space** to summon a terminal by default. Press it again to dismiss. Each invocation starts a fresh shell.
 
 ## Features
 
-- Global hotkey (Option+Space) toggles a floating terminal
+- Configurable global hotkey toggles a floating terminal
 - Powered by libghostty — uses your existing [Ghostty](https://ghostty.org) config and theme
 - Fresh shell on every open, pre-spawned in the background for instant launch
 - Runs as a menu bar app (no dock icon)
@@ -41,7 +41,7 @@ make run GHOSTTY_DIR=/path/to/ghostty
 
 ## Configuration
 
-Ghostlight creates a config file at `~/.ghostlight/config.json` on first run:
+Ghostlight creates a config file at `~/.ghostlight/settings.json` on first run:
 
 ```json
 {
@@ -52,6 +52,7 @@ Ghostlight creates a config file at `~/.ghostlight/config.json` on first run:
   "inner_corner_radius": 0,
   "font_size": 0,
   "working_directory": "",
+  "hotkey": "opt+space",
   "border_color": "",
   "padding_color": ""
 }
@@ -65,10 +66,12 @@ Ghostlight creates a config file at `~/.ghostlight/config.json` on first run:
 | `inner_corner_radius` | Corner radius of the terminal view inside the padding |
 | `font_size` | Terminal font size (`0` = use Ghostty default) |
 | `working_directory` | Shell starting directory (`""` = home, supports `~`) |
+| `hotkey` | Global shortcut string such as `opt+space`, `ctrl+grave`, or `cmd+shift+t` |
 | `border_color` | Panel border color as `#rrggbb` or `#rrggbbaa` (`""` = no border) |
 | `padding_color` | Padding area color, blended over Ghostty theme background (`""` = theme color, `#00000033` = slightly darker) |
 
 Config is reloaded every time you open the panel. You can also reload via **GL menu > Reload Config** in the menu bar.
+If you already have `~/.ghostlight/config.json`, Ghostlight will keep reading it as a legacy fallback.
 
 ## Building an App Bundle
 

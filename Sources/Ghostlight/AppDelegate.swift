@@ -1,10 +1,10 @@
 import AppKit
-import Carbon
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: GhostlightPanel!
     private var statusItem: NSStatusItem?
     private var hotkeyManager: HotkeyManager?
+    private var toggleMenuItem: NSMenuItem?
     var ghosttyApp: GhosttyApp!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -15,14 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel = GhostlightPanel(ghosttyApp: ghosttyApp)
 
         setupStatusItem()
-
-        // Global hotkey: Option+Space
-        hotkeyManager = HotkeyManager(
-            keyCode: UInt32(kVK_Space),
-            modifiers: UInt32(optionKey)
-        ) { [weak self] in
-            self?.togglePanel()
-        }
+        applyHotkeyConfig(ghosttyApp.config_)
 
         ghosttyApp.onSurfaceClosed = { [weak self] in
             self?.panel.hide()
@@ -37,11 +30,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(
-            title: "Toggle Terminal (Opt+Space)",
-            action: #selector(togglePanel),
-            keyEquivalent: ""
-        ))
+        let toggleItem = NSMenuItem(title: "", action: #selector(togglePanel), keyEquivalent: "")
+        menu.addItem(toggleItem)
+        toggleMenuItem = toggleItem
         menu.addItem(NSMenuItem(
             title: "Reload Config",
             action: #selector(reloadConfig),
@@ -54,15 +45,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: "q"
         ))
         statusItem?.menu = menu
+        updateToggleMenuItemTitle(with: ghosttyApp.config_)
+    }
+
+    private func applyHotkeyConfig(_ config: GhostlightConfig) {
+        let hotkey = config.parsedHotkey()
+        hotkeyManager = HotkeyManager(
+            keyCode: hotkey.keyCode,
+            modifiers: hotkey.modifiers
+        ) { [weak self] in
+            self?.togglePanel()
+        }
+        updateToggleMenuItemTitle(with: config)
+    }
+
+    private func updateToggleMenuItemTitle(with config: GhostlightConfig) {
+        toggleMenuItem?.title = "Toggle Terminal (\(config.hotkeyDisplayString()))"
+    }
+
+    private func reloadHotkeyConfigIfNeeded() {
+        let config = GhostlightConfig.load()
+        guard config.hotkey != ghosttyApp.config_.hotkey else { return }
+        ghosttyApp.config_ = config
+        applyHotkeyConfig(config)
     }
 
     @objc func togglePanel() {
+        reloadHotkeyConfigIfNeeded()
         panel.toggle()
     }
 
     @objc func reloadConfig() {
-        ghosttyApp.config_ = GhostlightConfig.load()
-        panel.applyConfig(ghosttyApp.config_, recreateSurface: true)
+        let config = GhostlightConfig.load()
+        ghosttyApp.config_ = config
+        applyHotkeyConfig(config)
+        panel.applyConfig(config, recreateSurface: true)
     }
 
     @objc func quit() {

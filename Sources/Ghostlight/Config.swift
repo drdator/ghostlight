@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 
 struct GhostlightConfig: Codable {
     var windowWidth: CGFloat = 720
@@ -8,15 +9,27 @@ struct GhostlightConfig: Codable {
     var innerCornerRadius: CGFloat = 0 // 0 = no rounding on terminal view
     var fontSize: Float = 0 // 0 = use Ghostty default
     var workingDirectory: String = "" // empty = user home directory
+    var hotkey: String = "opt+space" // e.g. "opt+space", "ctrl+`", "cmd+shift+t"
     var borderColor: String = "" // empty = no border, hex like "#3a3f4b"
     var paddingColor: String = "" // empty = use ghostty background
 
     static let configDir = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".ghostlight")
-    static let configFile = configDir.appendingPathComponent("config.json")
+    static let settingsFile = configDir.appendingPathComponent("settings.json")
+    static let legacyConfigFile = configDir.appendingPathComponent("config.json")
+
+    private static func loadFile() -> URL? {
+        if FileManager.default.fileExists(atPath: settingsFile.path) {
+            return settingsFile
+        }
+        if FileManager.default.fileExists(atPath: legacyConfigFile.path) {
+            return legacyConfigFile
+        }
+        return nil
+    }
 
     static func load() -> GhostlightConfig {
-        guard FileManager.default.fileExists(atPath: configFile.path) else {
+        guard let configFile = loadFile() else {
             let config = GhostlightConfig()
             config.save()
             return config
@@ -36,6 +49,7 @@ struct GhostlightConfig: Codable {
             if let v = json["inner_corner_radius"] as? CGFloat { cfg.innerCornerRadius = v }
             if let v = json["font_size"] as? Double { cfg.fontSize = Float(v) }
             if let v = json["working_directory"] as? String { cfg.workingDirectory = v }
+            if let v = json["hotkey"] as? String { cfg.hotkey = v }
             if let v = json["border_color"] as? String { cfg.borderColor = v }
             if let v = json["padding_color"] as? String { cfg.paddingColor = v }
             return cfg
@@ -69,6 +83,121 @@ struct GhostlightConfig: Codable {
     func parsedBorderColor() -> NSColor? { Self.parseHex(borderColor) }
     func parsedPaddingColor() -> NSColor? { Self.parseHex(paddingColor) }
 
+    func hotkeyDisplayString() -> String {
+        hotkey
+            .split(separator: "+")
+            .map {
+                let token = $0.lowercased().trimmingCharacters(in: .whitespaces)
+                switch token {
+                case "opt", "option", "alt":
+                    return "Opt"
+                case "cmd", "command":
+                    return "Cmd"
+                case "ctrl", "control":
+                    return "Ctrl"
+                case "shift":
+                    return "Shift"
+                case "space":
+                    return "Space"
+                case "return", "enter":
+                    return "Enter"
+                case "escape", "esc":
+                    return "Esc"
+                case "backtick", "grave":
+                    return "`"
+                default:
+                    let part = String($0).trimmingCharacters(in: .whitespaces)
+                    return part.count == 1 ? part.uppercased() : part.capitalized
+                }
+            }
+            .joined(separator: "+")
+    }
+
+    func parsedHotkey() -> (keyCode: UInt32, modifiers: UInt32) {
+        let parts = hotkey.lowercased().split(separator: "+").map { $0.trimmingCharacters(in: .whitespaces) }
+        var mods: UInt32 = 0
+        var key: String = ""
+
+        for part in parts {
+            switch part {
+            case "opt", "option", "alt": mods |= UInt32(optionKey)
+            case "cmd", "command":       mods |= UInt32(cmdKey)
+            case "ctrl", "control":      mods |= UInt32(controlKey)
+            case "shift":                mods |= UInt32(shiftKey)
+            default:                     key = part
+            }
+        }
+
+        let keyCode: UInt32 = switch key {
+        case "space":                    UInt32(kVK_Space)
+        case "`", "backtick", "grave":   UInt32(kVK_ANSI_Grave)
+        case "tab":                      UInt32(kVK_Tab)
+        case "return", "enter":          UInt32(kVK_Return)
+        case "escape", "esc":            UInt32(kVK_Escape)
+        case "a": UInt32(kVK_ANSI_A)
+        case "b": UInt32(kVK_ANSI_B)
+        case "c": UInt32(kVK_ANSI_C)
+        case "d": UInt32(kVK_ANSI_D)
+        case "e": UInt32(kVK_ANSI_E)
+        case "f": UInt32(kVK_ANSI_F)
+        case "g": UInt32(kVK_ANSI_G)
+        case "h": UInt32(kVK_ANSI_H)
+        case "i": UInt32(kVK_ANSI_I)
+        case "j": UInt32(kVK_ANSI_J)
+        case "k": UInt32(kVK_ANSI_K)
+        case "l": UInt32(kVK_ANSI_L)
+        case "m": UInt32(kVK_ANSI_M)
+        case "n": UInt32(kVK_ANSI_N)
+        case "o": UInt32(kVK_ANSI_O)
+        case "p": UInt32(kVK_ANSI_P)
+        case "q": UInt32(kVK_ANSI_Q)
+        case "r": UInt32(kVK_ANSI_R)
+        case "s": UInt32(kVK_ANSI_S)
+        case "t": UInt32(kVK_ANSI_T)
+        case "u": UInt32(kVK_ANSI_U)
+        case "v": UInt32(kVK_ANSI_V)
+        case "w": UInt32(kVK_ANSI_W)
+        case "x": UInt32(kVK_ANSI_X)
+        case "y": UInt32(kVK_ANSI_Y)
+        case "z": UInt32(kVK_ANSI_Z)
+        case "0": UInt32(kVK_ANSI_0)
+        case "1": UInt32(kVK_ANSI_1)
+        case "2": UInt32(kVK_ANSI_2)
+        case "3": UInt32(kVK_ANSI_3)
+        case "4": UInt32(kVK_ANSI_4)
+        case "5": UInt32(kVK_ANSI_5)
+        case "6": UInt32(kVK_ANSI_6)
+        case "7": UInt32(kVK_ANSI_7)
+        case "8": UInt32(kVK_ANSI_8)
+        case "9": UInt32(kVK_ANSI_9)
+        case "-", "minus":       UInt32(kVK_ANSI_Minus)
+        case "=", "equal":       UInt32(kVK_ANSI_Equal)
+        case "[":                UInt32(kVK_ANSI_LeftBracket)
+        case "]":                UInt32(kVK_ANSI_RightBracket)
+        case ";", "semicolon":   UInt32(kVK_ANSI_Semicolon)
+        case "'", "quote":       UInt32(kVK_ANSI_Quote)
+        case ",", "comma":       UInt32(kVK_ANSI_Comma)
+        case ".", "period":      UInt32(kVK_ANSI_Period)
+        case "/", "slash":       UInt32(kVK_ANSI_Slash)
+        case "\\", "backslash":  UInt32(kVK_ANSI_Backslash)
+        case "f1":  UInt32(kVK_F1)
+        case "f2":  UInt32(kVK_F2)
+        case "f3":  UInt32(kVK_F3)
+        case "f4":  UInt32(kVK_F4)
+        case "f5":  UInt32(kVK_F5)
+        case "f6":  UInt32(kVK_F6)
+        case "f7":  UInt32(kVK_F7)
+        case "f8":  UInt32(kVK_F8)
+        case "f9":  UInt32(kVK_F9)
+        case "f10": UInt32(kVK_F10)
+        case "f11": UInt32(kVK_F11)
+        case "f12": UInt32(kVK_F12)
+        default:     UInt32(kVK_Space) // fallback
+        }
+
+        return (keyCode, mods)
+    }
+
     func save() {
         do {
             try FileManager.default.createDirectory(
@@ -77,7 +206,7 @@ struct GhostlightConfig: Codable {
             encoder.keyEncodingStrategy = .convertToSnakeCase
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             let data = try encoder.encode(self)
-            try data.write(to: Self.configFile)
+            try data.write(to: Self.settingsFile)
         } catch {
             fputs("ghostlight: failed to write config: \(error)\n", stderr)
         }
