@@ -79,9 +79,14 @@ class GhostlightPanel {
     }
 
     func show() {
-        // Reload config visuals (don't recreate the pre-spawned surface)
-        ghosttyApp.config_ = GhostlightConfig.load()
-        applyConfig(ghosttyApp.config_)
+        let previousConfig = ghosttyApp.config_
+        let config = GhostlightConfig.load()
+        ghosttyApp.config_ = config
+        applyConfig(config)
+
+        if shouldRecreateSurfaceOnShow(previousConfig: previousConfig, newConfig: config) {
+            resetTerminalSurface(prewarm: false)
+        }
 
         if terminalView.surface == nil {
             terminalView.createSurface()
@@ -107,16 +112,48 @@ class GhostlightPanel {
     }
 
     func hide() {
-        // Destroy old shell and pre-create a fresh one so it's ready instantly
-        terminalView.destroySurface()
-        terminalView.createSurface()
+        let shouldResetSurface = ghosttyApp.config_.sessionMode == .fresh
+        hide(
+            resetSurface: shouldResetSurface,
+            prewarmFreshSession: shouldResetSurface,
+            deactivateSurfaceFirst: true
+        )
+    }
+
+    func surfaceDidClose() {
+        hide(
+            resetSurface: true,
+            prewarmFreshSession: ghosttyApp.config_.sessionMode == .fresh,
+            deactivateSurfaceFirst: false
+        )
+    }
+
+    private func hide(
+        resetSurface: Bool,
+        prewarmFreshSession: Bool,
+        deactivateSurfaceFirst: Bool
+    ) {
+        let finishHide = { [weak self] in
+            guard let self else { return }
+            self.panel.orderOut(nil)
+            if resetSurface {
+                self.resetTerminalSurface(prewarm: prewarmFreshSession)
+            }
+        }
+
+        if !isVisible {
+            finishHide()
+            return
+        }
+
+        if deactivateSurfaceFirst {
+            deactivateSurface()
+        }
 
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.15
             panel.animator().alphaValue = 0
-        }, completionHandler: { [weak self] in
-            self?.panel.orderOut(nil)
-        })
+        }, completionHandler: finishHide)
 
         isVisible = false
     }
@@ -138,9 +175,32 @@ class GhostlightPanel {
         terminalView.layer?.cornerRadius = cfg.innerCornerRadius
 
         if recreateSurface {
-            terminalView.destroySurface()
-            terminalView.createSurface()
+            resetTerminalSurface(prewarm: true)
         }
+    }
+
+    private func shouldRecreateSurfaceOnShow(
+        previousConfig: GhostlightConfig,
+        newConfig: GhostlightConfig
+    ) -> Bool {
+        guard !isVisible, terminalView.surface != nil else { return false }
+        if newConfig.requiresSurfaceRecreation(comparedTo: previousConfig) {
+            return true
+        }
+        return previousConfig.sessionMode == .persistent && newConfig.sessionMode == .fresh
+    }
+
+    private func deactivateSurface() {
+        guard let surface = terminalView.surface else { return }
+        ghostty_surface_set_focus(surface, false)
+        ghostty_surface_set_occlusion(surface, true)
+    }
+
+    private func resetTerminalSurface(prewarm: Bool) {
+        terminalView.destroySurface()
+        guard prewarm else { return }
+        terminalView.createSurface()
+        deactivateSurface()
     }
 
     private static func blendedPaddingColor(base: NSColor, overlay: NSColor?) -> NSColor {

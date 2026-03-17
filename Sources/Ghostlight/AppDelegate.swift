@@ -18,7 +18,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         applyHotkeyConfig(ghosttyApp.config_)
 
         ghosttyApp.onSurfaceClosed = { [weak self] in
-            self?.panel.hide()
+            self?.panel.surfaceDidClose()
         }
     }
 

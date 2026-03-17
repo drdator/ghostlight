@@ -1,6 +1,11 @@
 import AppKit
 import Carbon
 
+enum GhostlightSessionMode: String, Codable {
+    case fresh
+    case persistent
+}
+
 struct GhostlightConfig: Codable {
     var windowWidth: CGFloat = 720
     var windowHeight: CGFloat = 300
@@ -9,6 +14,7 @@ struct GhostlightConfig: Codable {
     var innerCornerRadius: CGFloat = 0 // 0 = no rounding on terminal view
     var fontSize: Float = 0 // 0 = use Ghostty default
     var workingDirectory: String = "" // empty = user home directory
+    var sessionMode: GhostlightSessionMode = .fresh
     var hotkey: String = "opt+space" // e.g. "opt+space", "ctrl+`", "cmd+shift+t"
     var borderColor: String = "" // empty = no border, hex like "#3a3f4b"
     var paddingColor: String = "" // empty = use ghostty background
@@ -49,6 +55,9 @@ struct GhostlightConfig: Codable {
             if let v = json["inner_corner_radius"] as? CGFloat { cfg.innerCornerRadius = v }
             if let v = json["font_size"] as? Double { cfg.fontSize = Float(v) }
             if let v = json["working_directory"] as? String { cfg.workingDirectory = v }
+            if let v = json["session_mode"] as? String {
+                cfg.sessionMode = GhostlightSessionMode(rawValue: v.lowercased()) ?? .fresh
+            }
             if let v = json["hotkey"] as? String { cfg.hotkey = v }
             if let v = json["border_color"] as? String { cfg.borderColor = v }
             if let v = json["padding_color"] as? String { cfg.paddingColor = v }
@@ -82,6 +91,15 @@ struct GhostlightConfig: Codable {
 
     func parsedBorderColor() -> NSColor? { Self.parseHex(borderColor) }
     func parsedPaddingColor() -> NSColor? { Self.parseHex(paddingColor) }
+
+    func requiresSurfaceRecreation(comparedTo other: GhostlightConfig) -> Bool {
+        fontSize != other.fontSize || resolvedWorkingDirectory() != other.resolvedWorkingDirectory()
+    }
+
+    private func resolvedWorkingDirectory() -> String {
+        guard workingDirectory.hasPrefix("~") else { return workingDirectory }
+        return NSString(string: workingDirectory).expandingTildeInPath
+    }
 
     func hotkeyDisplayString() -> String {
         hotkey

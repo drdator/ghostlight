@@ -8,7 +8,7 @@ Press **Option+Space** to summon a terminal by default. Press it again to dismis
 
 - Configurable global hotkey toggles a floating terminal
 - Powered by libghostty — uses your existing [Ghostty](https://ghostty.org) config and theme
-- Fresh shell on every open, pre-spawned in the background for instant launch
+- Configurable fresh or persistent sessions (`fresh` pre-spawns the next shell for instant launch)
 - Runs as a menu bar app (no dock icon)
 - Configurable window size, padding, corner radius, colors, font size, and working directory
 - Cmd+C / Cmd+V clipboard support
@@ -52,6 +52,7 @@ Ghostlight creates a config file at `~/.ghostlight/settings.json` on first run:
   "inner_corner_radius": 0,
   "font_size": 0,
   "working_directory": "",
+  "session_mode": "fresh",
   "hotkey": "opt+space",
   "border_color": "",
   "padding_color": ""
@@ -66,6 +67,7 @@ Ghostlight creates a config file at `~/.ghostlight/settings.json` on first run:
 | `inner_corner_radius` | Corner radius of the terminal view inside the padding |
 | `font_size` | Terminal font size (`0` = use Ghostty default) |
 | `working_directory` | Shell starting directory (`""` = home, supports `~`) |
+| `session_mode` | `"fresh"` starts a new shell on every open, `"persistent"` reuses the same shell until it exits |
 | `hotkey` | Global shortcut string such as `opt+space`, `ctrl+grave`, or `cmd+shift+t` |
 | `border_color` | Panel border color as `#rrggbb` or `#rrggbbaa` (`""` = no border) |
 | `padding_color` | Padding area color, blended over Ghostty theme background (`""` = theme color, `#00000033` = slightly darker) |
