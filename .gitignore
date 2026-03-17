@@ -4,3 +4,4 @@ Ghostlight.app/
 DerivedData/
 *.xcodeproj/
 *.xcworkspace/
+.DS_Store
