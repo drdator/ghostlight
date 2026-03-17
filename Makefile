@@ -1,4 +1,5 @@
 GHOSTTY_DIR ?= $(HOME)/ghostty
+export DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
 
 SWIFT_BUILD_FLAGS = \
 	-Xlinker -L$(GHOSTTY_DIR)/zig-out/lib \
