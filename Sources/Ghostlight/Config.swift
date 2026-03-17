@@ -5,7 +5,9 @@ struct GhostlightConfig: Codable {
     var windowHeight: CGFloat = 300
     var windowPadding: CGFloat = 16
     var cornerRadius: CGFloat = 12
+    var innerCornerRadius: CGFloat = 0 // 0 = no rounding on terminal view
     var fontSize: Float = 0 // 0 = use Ghostty default
+    var workingDirectory: String = "" // empty = user home directory
     var borderColor: String = "" // empty = no border, hex like "#3a3f4b"
     var paddingColor: String = "" // empty = use ghostty background
 
@@ -31,7 +33,9 @@ struct GhostlightConfig: Codable {
             if let v = json["window_height"] as? CGFloat { cfg.windowHeight = v }
             if let v = json["window_padding"] as? CGFloat { cfg.windowPadding = v }
             if let v = json["corner_radius"] as? CGFloat { cfg.cornerRadius = v }
+            if let v = json["inner_corner_radius"] as? CGFloat { cfg.innerCornerRadius = v }
             if let v = json["font_size"] as? Double { cfg.fontSize = Float(v) }
+            if let v = json["working_directory"] as? String { cfg.workingDirectory = v }
             if let v = json["border_color"] as? String { cfg.borderColor = v }
             if let v = json["padding_color"] as? String { cfg.paddingColor = v }
             return cfg

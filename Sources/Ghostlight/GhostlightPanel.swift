@@ -51,6 +51,8 @@ class GhostlightPanel {
         let insetFrame = contentBounds.insetBy(dx: cfg.windowPadding, dy: cfg.windowPadding)
         terminalView = TerminalView(frame: insetFrame)
         terminalView.autoresizingMask = [.width, .height]
+        terminalView.layer?.cornerRadius = cfg.innerCornerRadius
+        terminalView.layer?.masksToBounds = true
         terminalView.ghosttyApp = ghosttyApp
         ghosttyApp.activeTerminalView = terminalView
         containerView.addSubview(terminalView)
@@ -130,9 +132,10 @@ class GhostlightPanel {
         borderOverlay?.cornerRadius = cfg.cornerRadius
         borderOverlay?.borderColor = cfg.parsedBorderColor()
 
-        // Update terminal view inset
+        // Update terminal view inset and inner radius
         let contentBounds = containerView.bounds
         terminalView.frame = contentBounds.insetBy(dx: cfg.windowPadding, dy: cfg.windowPadding)
+        terminalView.layer?.cornerRadius = cfg.innerCornerRadius
 
         if recreateSurface {
             terminalView.destroySurface()
