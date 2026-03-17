@@ -4,8 +4,6 @@ A Spotlight-like floating terminal for macOS, powered by [libghostty](https://gi
 
 Press **Option+Space** to summon a terminal. Press it again to dismiss. Each invocation starts a fresh shell.
 
-![ghostlight](https://github.com/user-attachments/assets/placeholder.png)
-
 ## Features
 
 - Global hotkey (Option+Space) toggles a floating terminal
@@ -24,7 +22,7 @@ Press **Option+Space** to summon a terminal. Press it again to dismiss. Each inv
 ## Quick Start
 
 ```bash
-git clone https://github.com/youruser/ghostlight.git
+git clone https://github.com/drdator/ghostlight.git
 cd ghostlight
 
 # Clone Ghostty and build libghostty (first time only, takes a few minutes)
