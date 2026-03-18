@@ -147,14 +147,17 @@ class TerminalView: NSView {
     override func keyDown(with event: NSEvent) {
         guard let surface else { return }
 
-        let chars = event.characters ?? ""
+        // Function/arrow keys produce non-printable unicode — don't send as text,
+        // let ghostty handle them via keycode instead.
+        let isFunctionKey = event.modifierFlags.contains(.function)
+        let chars = isFunctionKey ? "" : (event.characters ?? "")
         let consumed: Bool = chars.withCString { cStr in
             var key = ghostty_input_key_s()
             key.action = GHOSTTY_ACTION_PRESS
             key.mods = Self.convertMods(event.modifierFlags)
             key.consumed_mods = GHOSTTY_MODS_NONE
             key.keycode = UInt32(event.keyCode)
-            key.text = cStr
+            key.text = isFunctionKey ? nil : cStr
             key.composing = false
             key.unshifted_codepoint = 0
             if let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first {
@@ -252,14 +255,15 @@ class TerminalView: NSView {
             }
         }
 
-        let chars = event.characters ?? ""
+        let isFnKey = event.modifierFlags.contains(.function)
+        let chars = isFnKey ? "" : (event.characters ?? "")
         let handled: Bool = chars.withCString { cStr in
             var key = ghostty_input_key_s()
             key.action = GHOSTTY_ACTION_PRESS
             key.mods = Self.convertMods(event.modifierFlags)
             key.consumed_mods = GHOSTTY_MODS_NONE
             key.keycode = UInt32(event.keyCode)
-            key.text = cStr
+            key.text = isFnKey ? nil : cStr
             key.composing = false
             key.unshifted_codepoint = 0
             if let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first {
