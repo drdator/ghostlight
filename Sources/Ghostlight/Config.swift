@@ -16,6 +16,8 @@ struct GhostlightConfig: Codable {
     var workingDirectory: String = "" // empty = user home directory
     var sessionMode: GhostlightSessionMode = .fresh
     var hotkey: String = "opt+space" // e.g. "opt+space", "ctrl+`", "cmd+shift+t"
+    var command: String = "" // command to run in the shell, e.g. "claude"
+    var prewarm: Bool = true // prewarm shell + command in background so it's ready instantly
     var borderColor: String = "" // empty = no border, hex like "#3a3f4b"
     var paddingColor: String = "" // empty = use ghostty background
 
@@ -59,6 +61,8 @@ struct GhostlightConfig: Codable {
                 cfg.sessionMode = GhostlightSessionMode(rawValue: v.lowercased()) ?? .fresh
             }
             if let v = json["hotkey"] as? String { cfg.hotkey = v }
+            if let v = json["command"] as? String { cfg.command = v }
+            if let v = json["prewarm"] as? Bool { cfg.prewarm = v }
             if let v = json["border_color"] as? String { cfg.borderColor = v }
             if let v = json["padding_color"] as? String { cfg.paddingColor = v }
             return cfg

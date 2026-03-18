@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520" width="400" height="520">
+  <!-- Circle arc (open at bottom) -->
+  <path
+    d="M 95 315 A 148 148 0 1 1 305 315"
+    fill="none"
+    stroke="#2d2d2d"
+    stroke-width="18"
+    stroke-linecap="round"
+  />
+
+  <!-- Ghost silhouette -->
+  <path
+    d="
+      M 200 58
+      C 260 58, 320 112, 320 192
+      C 320 248, 306 292, 290 332
+      C 280 356, 286 376, 302 404
+      C 318 432, 324 460, 302 464
+      C 282 467, 254 432, 234 402
+      C 222 384, 214 376, 206 370
+      C 198 366, 196 380, 193 390
+      C 190 398, 184 390, 180 380
+      C 174 366, 164 370, 156 380
+      C 146 396, 134 392, 128 376
+      C 118 348, 100 290, 92 240
+      C 84 190, 94 128, 138 82
+      C 158 62, 178 58, 200 58
+      Z
+    "
+    fill="#2d2d2d"
+  />
+
+  <!-- Left eye -->
+  <ellipse cx="173" cy="190" rx="11" ry="14" fill="white" />
+  <!-- Right eye -->
+  <ellipse cx="218" cy="190" rx="11" ry="14" fill="white" />
+</svg>

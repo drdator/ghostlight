@@ -55,6 +55,8 @@ Ghostlight creates a config file at `~/.ghostlight/settings.json` on first run:
   "working_directory": "",
   "session_mode": "fresh",
   "hotkey": "opt+space",
+  "command": "",
+  "prewarm": true,
   "border_color": "",
   "padding_color": ""
 }
@@ -70,6 +72,8 @@ Ghostlight creates a config file at `~/.ghostlight/settings.json` on first run:
 | `working_directory` | Shell starting directory (`""` = home, supports `~`) |
 | `session_mode` | `"fresh"` starts a new shell on every open, `"persistent"` reuses the same shell until it exits |
 | `hotkey` | Global shortcut string such as `opt+space`, `ctrl+grave`, or `cmd+shift+t` |
+| `command` | Command to run automatically in the shell (e.g. `"claude"`) |
+| `prewarm` | When `true`, the shell and command are started in the background after dismissing so everything is ready instantly on the next summon |
 | `border_color` | Panel border color as `#rrggbb` or `#rrggbbaa` (`""` = no border) |
 | `padding_color` | Padding area color, blended over Ghostty theme background (`""` = theme color, `#00000033` = slightly darker) |
 

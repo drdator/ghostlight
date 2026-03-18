@@ -9,6 +9,7 @@ class GhostlightPanel {
     private var panelDelegate: NSWindowDelegate?
     private var containerView: NSView!
     private var borderOverlay: BorderOverlayView?
+    private var pendingCommand = true
 
     init(ghosttyApp: GhosttyApp) {
         self.ghosttyApp = ghosttyApp
@@ -91,7 +92,8 @@ class GhostlightPanel {
             resetTerminalSurface(prewarm: false)
         }
 
-        if terminalView.surface == nil {
+        let needsNewSurface = terminalView.surface == nil
+        if needsNewSurface {
             terminalView.createSurface()
         }
 
@@ -112,6 +114,19 @@ class GhostlightPanel {
         }
 
         isVisible = true
+
+        // Send command for new surfaces that weren't prewarmed
+        if needsNewSurface, pendingCommand, !config.command.isEmpty {
+            pendingCommand = false
+            sendCommand(config.command)
+        }
+    }
+
+    private func sendCommand(_ command: String) {
+        // Small delay to let the shell initialize before sending input
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.terminalView.sendText(command + "\n")
+        }
     }
 
     func hide() {
@@ -201,9 +216,17 @@ class GhostlightPanel {
 
     private func resetTerminalSurface(prewarm: Bool) {
         terminalView.destroySurface()
-        guard prewarm else { return }
+        let config = ghosttyApp.config_
+        let shouldPrewarm = prewarm && config.prewarm
+        pendingCommand = !shouldPrewarm
+        guard shouldPrewarm else { return }
         terminalView.createSurface()
         deactivateSurface()
+
+        // Send command during prewarm so it's already running when the panel appears
+        if !config.command.isEmpty {
+            sendCommand(config.command)
+        }
     }
 
     private static func blendedPaddingColor(base: NSColor, overlay: NSColor?) -> NSColor {

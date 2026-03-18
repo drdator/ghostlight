@@ -88,6 +88,17 @@ class TerminalView: NSView {
         }
     }
 
+    func sendText(_ text: String) {
+        guard let surface else { return }
+        let utf8 = Array(text.utf8)
+        utf8.withUnsafeBufferPointer { buf in
+            guard let base = buf.baseAddress else { return }
+            base.withMemoryRebound(to: CChar.self, capacity: buf.count) { ptr in
+                ghostty_surface_text(surface, ptr, UInt(buf.count))
+            }
+        }
+    }
+
     // MARK: - Layout
 
     override func setFrameSize(_ newSize: NSSize) {
