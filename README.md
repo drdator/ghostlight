@@ -4,6 +4,10 @@ A Spotlight-like floating terminal for macOS, powered by [libghostty](https://gi
 
 Press **Option+Space** to summon a terminal by default. Press it again to dismiss. Each invocation starts a fresh shell.
 
+![Shell profile](assets/screenshot-shell.png)
+
+![Claude Code profile](assets/screenshot-claude.png)
+
 ## Features
 
 - Configurable global hotkey toggles a floating terminal
