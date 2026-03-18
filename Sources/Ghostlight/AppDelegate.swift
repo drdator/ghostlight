@@ -66,6 +66,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let label = panel.profileName ?? "Terminal"
             let title = "\(label) (\(config.hotkeyDisplayString()))"
             let item = NSMenuItem(title: title, action: #selector(togglePanel(_:)), keyEquivalent: "")
+            item.target = self
             item.representedObject = panel
             menu.addItem(item)
         }

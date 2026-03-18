@@ -34,6 +34,7 @@ class TerminalView: NSView {
 
     override var acceptsFirstResponder: Bool { true }
     override var canBecomeKeyView: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
 
     override func updateLayer() {
         guard let surface else { return }
@@ -274,8 +275,7 @@ class TerminalView: NSView {
 
     private func mousePoint(from event: NSEvent) -> (Double, Double) {
         let point = convert(event.locationInWindow, from: nil)
-        let scale = Double(window?.backingScaleFactor ?? 2.0)
-        return (point.x * scale, (frame.height - point.y) * scale)
+        return (point.x, bounds.height - point.y)
     }
 
     override func mouseDown(with event: NSEvent) {

@@ -64,8 +64,10 @@ class GhosttyApp {
         guard let app else { return }
         ghostty_app_tick(app)
 
+        // Only draw surfaces in visible windows — prewarmed surfaces in
+        // hidden panels have no valid Metal drawable.
         for view in terminalViews.allObjects {
-            if let surface = view.surface {
+            if let surface = view.surface, view.window?.isVisible == true {
                 ghostty_surface_draw(surface)
                 view.layer?.setNeedsDisplay()
             }
@@ -251,12 +253,13 @@ private func ghostlightWriteClipboard(
     _ confirm: Bool
 ) {
     guard let content, count > 0 else { return }
+    // Copy string before async dispatch — content pointer may be freed after return
+    let str = content.pointee.data.map { String(cString: $0) }
     DispatchQueue.main.async {
+        guard let str else { return }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        if let data = content.pointee.data {
-            pasteboard.setString(String(cString: data), forType: .string)
-        }
+        pasteboard.setString(str, forType: .string)
     }
 }
 
