@@ -9,6 +9,8 @@ Press **Option+Space** to summon a terminal by default. Press it again to dismis
 - Configurable global hotkey toggles a floating terminal
 - Powered by libghostty — uses your existing [Ghostty](https://ghostty.org) config and theme
 - Configurable fresh or persistent sessions (`fresh` pre-spawns the next shell for instant launch)
+- **Profiles** — define multiple terminals with different hotkeys, commands, and settings
+- Auto-run a command on launch (e.g. `claude`) with optional prewarming
 - Runs as a menu bar app (no dock icon)
 - Configurable window size, padding, corner radius, colors, font size, and working directory
 - `Cmd+Enter` copies the last command output and closes, `Cmd+Shift+Enter` copies the full buffer and closes
@@ -79,6 +81,35 @@ Ghostlight creates a config file at `~/.ghostlight/settings.json` on first run:
 
 Config is reloaded every time you open the panel. You can also reload via **GL menu > Reload Config** in the menu bar.
 If you already have `~/.ghostlight/config.json`, Ghostlight will keep reading it as a legacy fallback.
+
+### Profiles
+
+Use `profiles` to define multiple terminals, each with its own hotkey and settings. Every profile inherits from the root config and overrides only what it specifies:
+
+```json
+{
+  "window_width": 720,
+  "window_height": 300,
+  "session_mode": "fresh",
+  "prewarm": true,
+  "profiles": [
+    {
+      "name": "Shell",
+      "hotkey": "opt+1",
+      "font_size": 16,
+      "working_directory": "~"
+    },
+    {
+      "name": "Claude",
+      "hotkey": "opt+2",
+      "command": "claude",
+      "working_directory": "~/projects"
+    }
+  ]
+}
+```
+
+When profiles are defined, each profile gets its own floating panel and hotkey. The root-level `hotkey` is ignored — each profile must specify its own. Reload Config from the menu bar picks up profile changes.
 
 ## Building an App Bundle
 

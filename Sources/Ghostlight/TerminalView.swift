@@ -7,6 +7,7 @@ class TerminalView: NSView {
     var surface: ghostty_surface_t?
     weak var ghosttyApp: GhosttyApp?
     var onCopyVisibleContentAndClose: (() -> Void)?
+    var onSurfaceClosed: (() -> Void)?
     private var trackingArea: NSTrackingArea?
 
     // MARK: - Init
@@ -41,7 +42,7 @@ class TerminalView: NSView {
 
     // MARK: - Surface Lifecycle
 
-    func createSurface() {
+    func createSurface(fontSize: Float = 0, workingDirectory: String = "") {
         guard let appHandle = ghosttyApp?.app else { return }
 
         var config = ghostty_surface_config_new()
@@ -51,10 +52,10 @@ class TerminalView: NSView {
         )
         config.userdata = Unmanaged.passUnretained(self).toOpaque()
         config.scale_factor = Double(window?.backingScaleFactor ?? 2.0)
-        config.font_size = ghosttyApp?.config_.fontSize ?? 0
+        config.font_size = fontSize
         config.context = GHOSTTY_SURFACE_CONTEXT_WINDOW
 
-        var dir = ghosttyApp?.config_.workingDirectory ?? ""
+        var dir = workingDirectory
         if dir.hasPrefix("~") {
             dir = NSString(string: dir).expandingTildeInPath
         }

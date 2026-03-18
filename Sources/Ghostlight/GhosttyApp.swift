@@ -5,14 +5,11 @@ import QuartzCore
 class GhosttyApp {
     var app: ghostty_app_t?
     var config: ghostty_config_t?
-    var onSurfaceClosed: (() -> Void)?
     var backgroundColor: NSColor = NSColor(white: 0.12, alpha: 1.0)
-    var config_: GhostlightConfig
-    weak var activeTerminalView: TerminalView?
+    private(set) var terminalViews = NSHashTable<TerminalView>.weakObjects()
     private var tickTimer: Timer?
 
     init() {
-        config_ = GhostlightConfig.load()
         config = ghostty_config_new()
         guard let config else { return }
 
@@ -55,19 +52,25 @@ class GhosttyApp {
         RunLoop.main.add(tickTimer!, forMode: .common)
     }
 
+    func registerTerminalView(_ view: TerminalView) {
+        terminalViews.add(view)
+    }
+
+    func unregisterTerminalView(_ view: TerminalView) {
+        terminalViews.remove(view)
+    }
+
     func tick() {
         guard let app else { return }
         ghostty_app_tick(app)
 
-        // After processing events, draw the surface and
-        // flush Core Animation so the Metal content appears on screen.
-        if let surface = activeTerminalView?.surface {
-            ghostty_surface_draw(surface)
-            if let layer = activeTerminalView?.layer {
-                layer.setNeedsDisplay()
-                CATransaction.flush()
+        for view in terminalViews.allObjects {
+            if let surface = view.surface {
+                ghostty_surface_draw(surface)
+                view.layer?.setNeedsDisplay()
             }
         }
+        CATransaction.flush()
     }
 
     deinit {
@@ -78,6 +81,8 @@ class GhosttyApp {
 }
 
 // MARK: - Runtime Callbacks (C-compatible free functions)
+
+// App-level callbacks receive runtime userdata (GhosttyApp)
 
 private func ghostlightWakeup(_ userdata: UnsafeMutableRawPointer?) {
     guard let userdata else { return }
@@ -96,7 +101,6 @@ private func ghostlightAction(
 
     switch action.tag {
     case GHOSTTY_ACTION_SET_TITLE:
-        // Optionally update panel title
         return true
 
     case GHOSTTY_ACTION_MOUSE_SHAPE:
@@ -128,12 +132,21 @@ private func ghostlightAction(
         return true
 
     case GHOSTTY_ACTION_CLOSE_WINDOW:
-        DispatchQueue.main.async { app.onSurfaceClosed?() }
+        // Use the target surface to find which terminal view to close
+        if target.tag == GHOSTTY_TARGET_SURFACE {
+            let surfacePtr = target.target.surface
+            if let ud = ghostty_surface_userdata(surfacePtr) {
+                let view = Unmanaged<TerminalView>.fromOpaque(ud).takeUnretainedValue()
+                DispatchQueue.main.async { view.onSurfaceClosed?() }
+            }
+        }
         return true
 
     case GHOSTTY_ACTION_RENDER:
         DispatchQueue.main.async {
-            app.activeTerminalView?.needsDisplay = true
+            for view in app.terminalViews.allObjects {
+                view.needsDisplay = true
+            }
         }
         return true
 
@@ -155,15 +168,19 @@ private func ghostlightAction(
         let limits = action.action.size_limit
         if target.tag == GHOSTTY_TARGET_SURFACE {
             DispatchQueue.main.async {
-                guard let panel = app.activeTerminalView?.window else { return }
-                var minSize = panel.minSize
-                var maxSize = panel.maxSize
-                if limits.min_width > 0 { minSize.width = CGFloat(limits.min_width) }
-                if limits.min_height > 0 { minSize.height = CGFloat(limits.min_height) }
-                if limits.max_width > 0 { maxSize.width = CGFloat(limits.max_width) }
-                if limits.max_height > 0 { maxSize.height = CGFloat(limits.max_height) }
-                panel.minSize = minSize
-                panel.maxSize = maxSize
+                let surfacePtr = target.target.surface
+                if let ud = ghostty_surface_userdata(surfacePtr) {
+                    let view = Unmanaged<TerminalView>.fromOpaque(ud).takeUnretainedValue()
+                    guard let panel = view.window else { return }
+                    var minSize = panel.minSize
+                    var maxSize = panel.maxSize
+                    if limits.min_width > 0 { minSize.width = CGFloat(limits.min_width) }
+                    if limits.min_height > 0 { minSize.height = CGFloat(limits.min_height) }
+                    if limits.max_width > 0 { maxSize.width = CGFloat(limits.max_width) }
+                    if limits.max_height > 0 { maxSize.height = CGFloat(limits.max_height) }
+                    panel.minSize = minSize
+                    panel.maxSize = maxSize
+                }
             }
         }
         return true
@@ -190,16 +207,17 @@ private func ghostlightAction(
     }
 }
 
+// Surface-level callbacks receive surface userdata (TerminalView)
+
 private func ghostlightReadClipboard(
     _ userdata: UnsafeMutableRawPointer?,
     _ location: ghostty_clipboard_e,
     _ state: UnsafeMutableRawPointer?
 ) -> Bool {
     guard let userdata else { return false }
-    let app = Unmanaged<GhosttyApp>.fromOpaque(userdata).takeUnretainedValue()
-    guard let surface = app.activeTerminalView?.surface else { return false }
+    let view = Unmanaged<TerminalView>.fromOpaque(userdata).takeUnretainedValue()
+    guard let surface = view.surface else { return false }
 
-    // Read clipboard and complete on next run loop to avoid re-entrancy
     let str = NSPasteboard.general.string(forType: .string) ?? ""
     let strCopy = strdup(str)
     DispatchQueue.main.async {
@@ -216,9 +234,8 @@ private func ghostlightConfirmReadClipboard(
     _ request: ghostty_clipboard_request_e
 ) {
     guard let userdata else { return }
-    let app = Unmanaged<GhosttyApp>.fromOpaque(userdata).takeUnretainedValue()
-    guard let surface = app.activeTerminalView?.surface else { return }
-    // Auto-confirm, defer to avoid re-entrancy
+    let view = Unmanaged<TerminalView>.fromOpaque(userdata).takeUnretainedValue()
+    guard let surface = view.surface else { return }
     let contentsCopy = contents != nil ? strdup(contents!) : nil
     DispatchQueue.main.async {
         ghostty_surface_complete_clipboard_request(surface, contentsCopy, state, true)
@@ -248,6 +265,6 @@ private func ghostlightCloseSurface(
     _ processAlive: Bool
 ) {
     guard let userdata else { return }
-    let app = Unmanaged<GhosttyApp>.fromOpaque(userdata).takeUnretainedValue()
-    DispatchQueue.main.async { app.onSurfaceClosed?() }
+    let view = Unmanaged<TerminalView>.fromOpaque(userdata).takeUnretainedValue()
+    DispatchQueue.main.async { view.onSurfaceClosed?() }
 }

@@ -6,6 +6,42 @@ enum GhostlightSessionMode: String, Codable {
     case persistent
 }
 
+struct GhostlightProfile {
+    var name: String = ""
+    var windowWidth: CGFloat?
+    var windowHeight: CGFloat?
+    var windowPadding: CGFloat?
+    var cornerRadius: CGFloat?
+    var innerCornerRadius: CGFloat?
+    var fontSize: Float?
+    var workingDirectory: String?
+    var sessionMode: String?
+    var hotkey: String?
+    var command: String?
+    var prewarm: Bool?
+    var borderColor: String?
+    var paddingColor: String?
+
+    static func parse(_ dict: [String: Any]) -> GhostlightProfile {
+        var p = GhostlightProfile()
+        if let v = dict["name"] as? String { p.name = v }
+        if let v = dict["window_width"] as? CGFloat { p.windowWidth = v }
+        if let v = dict["window_height"] as? CGFloat { p.windowHeight = v }
+        if let v = dict["window_padding"] as? CGFloat { p.windowPadding = v }
+        if let v = dict["corner_radius"] as? CGFloat { p.cornerRadius = v }
+        if let v = dict["inner_corner_radius"] as? CGFloat { p.innerCornerRadius = v }
+        if let v = dict["font_size"] as? Double { p.fontSize = Float(v) }
+        if let v = dict["working_directory"] as? String { p.workingDirectory = v }
+        if let v = dict["session_mode"] as? String { p.sessionMode = v }
+        if let v = dict["hotkey"] as? String { p.hotkey = v }
+        if let v = dict["command"] as? String { p.command = v }
+        if let v = dict["prewarm"] as? Bool { p.prewarm = v }
+        if let v = dict["border_color"] as? String { p.borderColor = v }
+        if let v = dict["padding_color"] as? String { p.paddingColor = v }
+        return p
+    }
+}
+
 struct GhostlightConfig: Codable {
     var windowWidth: CGFloat = 720
     var windowHeight: CGFloat = 300
@@ -20,6 +56,15 @@ struct GhostlightConfig: Codable {
     var prewarm: Bool = true // prewarm shell + command in background so it's ready instantly
     var borderColor: String = "" // empty = no border, hex like "#3a3f4b"
     var paddingColor: String = "" // empty = use ghostty background
+
+    // Not serialized — populated during load
+    var profiles: [GhostlightProfile] = []
+
+    enum CodingKeys: String, CodingKey {
+        case windowWidth, windowHeight, windowPadding, cornerRadius, innerCornerRadius
+        case fontSize, workingDirectory, sessionMode, hotkey, command, prewarm
+        case borderColor, paddingColor
+    }
 
     static let configDir = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".ghostlight")
@@ -48,28 +93,57 @@ struct GhostlightConfig: Codable {
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 return GhostlightConfig()
             }
-            // Merge with defaults so missing keys use default values
             var cfg = GhostlightConfig()
-            if let v = json["window_width"] as? CGFloat { cfg.windowWidth = v }
-            if let v = json["window_height"] as? CGFloat { cfg.windowHeight = v }
-            if let v = json["window_padding"] as? CGFloat { cfg.windowPadding = v }
-            if let v = json["corner_radius"] as? CGFloat { cfg.cornerRadius = v }
-            if let v = json["inner_corner_radius"] as? CGFloat { cfg.innerCornerRadius = v }
-            if let v = json["font_size"] as? Double { cfg.fontSize = Float(v) }
-            if let v = json["working_directory"] as? String { cfg.workingDirectory = v }
-            if let v = json["session_mode"] as? String {
-                cfg.sessionMode = GhostlightSessionMode(rawValue: v.lowercased()) ?? .fresh
+            cfg.applyJSON(json)
+
+            if let profilesArray = json["profiles"] as? [[String: Any]] {
+                cfg.profiles = profilesArray.map { GhostlightProfile.parse($0) }
             }
-            if let v = json["hotkey"] as? String { cfg.hotkey = v }
-            if let v = json["command"] as? String { cfg.command = v }
-            if let v = json["prewarm"] as? Bool { cfg.prewarm = v }
-            if let v = json["border_color"] as? String { cfg.borderColor = v }
-            if let v = json["padding_color"] as? String { cfg.paddingColor = v }
+
             return cfg
         } catch {
             fputs("ghostlight: failed to read config: \(error)\n", stderr)
             return GhostlightConfig()
         }
+    }
+
+    mutating func applyJSON(_ json: [String: Any]) {
+        if let v = json["window_width"] as? CGFloat { windowWidth = v }
+        if let v = json["window_height"] as? CGFloat { windowHeight = v }
+        if let v = json["window_padding"] as? CGFloat { windowPadding = v }
+        if let v = json["corner_radius"] as? CGFloat { cornerRadius = v }
+        if let v = json["inner_corner_radius"] as? CGFloat { innerCornerRadius = v }
+        if let v = json["font_size"] as? Double { fontSize = Float(v) }
+        if let v = json["working_directory"] as? String { workingDirectory = v }
+        if let v = json["session_mode"] as? String {
+            sessionMode = GhostlightSessionMode(rawValue: v.lowercased()) ?? .fresh
+        }
+        if let v = json["hotkey"] as? String { hotkey = v }
+        if let v = json["command"] as? String { command = v }
+        if let v = json["prewarm"] as? Bool { prewarm = v }
+        if let v = json["border_color"] as? String { borderColor = v }
+        if let v = json["padding_color"] as? String { paddingColor = v }
+    }
+
+    func resolved(with profile: GhostlightProfile) -> GhostlightConfig {
+        var cfg = self
+        cfg.profiles = []
+        if let v = profile.windowWidth { cfg.windowWidth = v }
+        if let v = profile.windowHeight { cfg.windowHeight = v }
+        if let v = profile.windowPadding { cfg.windowPadding = v }
+        if let v = profile.cornerRadius { cfg.cornerRadius = v }
+        if let v = profile.innerCornerRadius { cfg.innerCornerRadius = v }
+        if let v = profile.fontSize { cfg.fontSize = v }
+        if let v = profile.workingDirectory { cfg.workingDirectory = v }
+        if let v = profile.sessionMode {
+            cfg.sessionMode = GhostlightSessionMode(rawValue: v.lowercased()) ?? cfg.sessionMode
+        }
+        if let v = profile.hotkey { cfg.hotkey = v }
+        if let v = profile.command { cfg.command = v }
+        if let v = profile.prewarm { cfg.prewarm = v }
+        if let v = profile.borderColor { cfg.borderColor = v }
+        if let v = profile.paddingColor { cfg.paddingColor = v }
+        return cfg
     }
 
     static func parseHex(_ str: String) -> NSColor? {

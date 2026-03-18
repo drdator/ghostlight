@@ -2,16 +2,20 @@ import Carbon
 
 class HotkeyManager {
     private var hotKeyRef: EventHotKeyRef?
-    private static var handler: (() -> Void)?
+    private static var handlers: [UInt32: () -> Void] = [:]
+    private static var nextID: UInt32 = 1
     private static var eventHandlerInstalled = false
+    private let hotkeyID: UInt32
 
     init(keyCode: UInt32, modifiers: UInt32, handler: @escaping () -> Void) {
-        Self.handler = handler
+        hotkeyID = Self.nextID
+        Self.nextID += 1
+        Self.handlers[hotkeyID] = handler
         Self.installEventHandlerIfNeeded()
 
         let hotKeyID = EventHotKeyID(
             signature: OSType(0x474C4854), // "GLHT"
-            id: 1
+            id: hotkeyID
         )
 
         let status = RegisterEventHotKey(
@@ -38,8 +42,18 @@ class HotkeyManager {
 
         InstallEventHandler(
             GetApplicationEventTarget(),
-            { (_: EventHandlerCallRef?, _: EventRef?, _: UnsafeMutableRawPointer?) -> OSStatus in
-                HotkeyManager.handler?()
+            { (_: EventHandlerCallRef?, event: EventRef?, _: UnsafeMutableRawPointer?) -> OSStatus in
+                var hotKeyID = EventHotKeyID()
+                GetEventParameter(
+                    event,
+                    EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    nil,
+                    MemoryLayout<EventHotKeyID>.size,
+                    nil,
+                    &hotKeyID
+                )
+                HotkeyManager.handlers[hotKeyID.id]?()
                 return noErr
             },
             1,
@@ -52,6 +66,7 @@ class HotkeyManager {
     }
 
     deinit {
+        Self.handlers.removeValue(forKey: hotkeyID)
         if let hotKeyRef {
             UnregisterEventHotKey(hotKeyRef)
         }

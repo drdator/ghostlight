@@ -10,13 +10,16 @@ class GhostlightPanel {
     private var containerView: NSView!
     private var borderOverlay: BorderOverlayView?
     private var pendingCommand = true
+    let profileName: String?
+    var currentConfig: GhostlightConfig
 
-    init(ghosttyApp: GhosttyApp) {
+    init(ghosttyApp: GhosttyApp, config: GhostlightConfig, profileName: String? = nil) {
         self.ghosttyApp = ghosttyApp
+        self.profileName = profileName
+        self.currentConfig = config
 
-        let cfg = ghosttyApp.config_
         panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: cfg.windowWidth, height: cfg.windowHeight),
+            contentRect: NSRect(x: 0, y: 0, width: config.windowWidth, height: config.windowHeight),
             styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -43,29 +46,32 @@ class GhostlightPanel {
         containerView = NSView(frame: contentBounds)
         containerView.autoresizingMask = [.width, .height]
         containerView.wantsLayer = true
-        containerView.layer!.cornerRadius = cfg.cornerRadius
+        containerView.layer!.cornerRadius = config.cornerRadius
         containerView.layer!.masksToBounds = true
-        containerView.layer!.backgroundColor = Self.blendedPaddingColor(base: ghosttyApp.backgroundColor, overlay: cfg.parsedPaddingColor()).cgColor
+        containerView.layer!.backgroundColor = Self.blendedPaddingColor(base: ghosttyApp.backgroundColor, overlay: config.parsedPaddingColor()).cgColor
         panel.contentView?.addSubview(containerView)
 
         // Terminal view with padding inside container
-        let insetFrame = contentBounds.insetBy(dx: cfg.windowPadding, dy: cfg.windowPadding)
+        let insetFrame = contentBounds.insetBy(dx: config.windowPadding, dy: config.windowPadding)
         terminalView = TerminalView(frame: insetFrame)
         terminalView.autoresizingMask = [.width, .height]
-        terminalView.layer?.cornerRadius = cfg.innerCornerRadius
+        terminalView.layer?.cornerRadius = config.innerCornerRadius
         terminalView.layer?.masksToBounds = true
         terminalView.ghosttyApp = ghosttyApp
         terminalView.onCopyVisibleContentAndClose = { [weak self] in
             self?.hide()
         }
-        ghosttyApp.activeTerminalView = terminalView
+        terminalView.onSurfaceClosed = { [weak self] in
+            self?.surfaceDidClose()
+        }
+        ghosttyApp.registerTerminalView(terminalView)
         containerView.addSubview(terminalView)
 
         // Border overlay on top of everything (Metal can't cover this)
         let overlay = BorderOverlayView(frame: contentBounds)
         overlay.autoresizingMask = [.width, .height]
-        overlay.cornerRadius = cfg.cornerRadius
-        overlay.borderColor = cfg.parsedBorderColor()
+        overlay.cornerRadius = config.cornerRadius
+        overlay.borderColor = config.parsedBorderColor()
         panel.contentView?.addSubview(overlay)
         borderOverlay = overlay
 
@@ -83,9 +89,9 @@ class GhostlightPanel {
     }
 
     func show() {
-        let previousConfig = ghosttyApp.config_
-        let config = GhostlightConfig.load()
-        ghosttyApp.config_ = config
+        let previousConfig = currentConfig
+        currentConfig = resolveConfig()
+        let config = currentConfig
         applyConfig(config)
 
         if shouldRecreateSurfaceOnShow(previousConfig: previousConfig, newConfig: config) {
@@ -94,7 +100,7 @@ class GhostlightPanel {
 
         let needsNewSurface = terminalView.surface == nil
         if needsNewSurface {
-            terminalView.createSurface()
+            terminalView.createSurface(fontSize: currentConfig.fontSize, workingDirectory: currentConfig.workingDirectory)
         }
 
         panel.center()
@@ -122,15 +128,23 @@ class GhostlightPanel {
         }
     }
 
+    private func resolveConfig() -> GhostlightConfig {
+        let fullConfig = GhostlightConfig.load()
+        guard let profileName,
+              let profile = fullConfig.profiles.first(where: { $0.name == profileName }) else {
+            return fullConfig
+        }
+        return fullConfig.resolved(with: profile)
+    }
+
     private func sendCommand(_ command: String) {
-        // Small delay to let the shell initialize before sending input
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             self?.terminalView.sendText(command + "\n")
         }
     }
 
     func hide() {
-        let shouldResetSurface = ghosttyApp.config_.sessionMode == .fresh
+        let shouldResetSurface = currentConfig.sessionMode == .fresh
         hide(
             resetSurface: shouldResetSurface,
             prewarmFreshSession: shouldResetSurface,
@@ -141,7 +155,7 @@ class GhostlightPanel {
     func surfaceDidClose() {
         hide(
             resetSurface: true,
-            prewarmFreshSession: ghosttyApp.config_.sessionMode == .fresh,
+            prewarmFreshSession: currentConfig.sessionMode == .fresh,
             deactivateSurfaceFirst: false
         )
     }
@@ -216,14 +230,13 @@ class GhostlightPanel {
 
     private func resetTerminalSurface(prewarm: Bool) {
         terminalView.destroySurface()
-        let config = ghosttyApp.config_
+        let config = currentConfig
         let shouldPrewarm = prewarm && config.prewarm
         pendingCommand = !shouldPrewarm
         guard shouldPrewarm else { return }
-        terminalView.createSurface()
+        terminalView.createSurface(fontSize: currentConfig.fontSize, workingDirectory: currentConfig.workingDirectory)
         deactivateSurface()
 
-        // Send command during prewarm so it's already running when the panel appears
         if !config.command.isEmpty {
             sendCommand(config.command)
         }
